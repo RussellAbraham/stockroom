@@ -1,0 +1,9 @@
+node_modules/
+.clasprc.json
+.clasp.json
+.env
+.env.*
+!.env.example
+coverage/
+.DS_Store
+Thumbs.db

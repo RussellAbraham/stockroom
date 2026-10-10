@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    >
+    <title>Stockroom</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        max-width: 720px;
+        margin: 48px auto;
+        padding: 0 20px;
+        line-height: 1.6;
+      }
+
+      main {
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        padding: 24px;
+      }
+
+      button {
+        padding: 10px 16px;
+        cursor: pointer;
+      }
+
+      #status {
+        margin-top: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Stockroom</h1>
+      <p>Inventory management, built with Google Apps Script.</p>
+
+      <button id="health-check" type="button">
+        Check server connection
+      </button>
+
+      <p id="status" role="status" aria-live="polite">
+        Not checked yet.
+      </p>
+    </main>
+
+    <script>
+      const button = document.getElementById('health-check');
+      const status = document.getElementById('status');
+
+      button.addEventListener('click', function () {
+        button.disabled = true;
+        status.textContent = 'Checking server…';
+
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (
+              !result ||
+              result.ok !== true ||
+              result.application !== 'Stockroom' ||
+              result.status !== 'ready'
+            ) {
+              status.textContent = 'Unexpected server response.';
+              button.disabled = false;
+              return;
+            }
+
+            status.textContent = 'Server connection successful.';
+            button.disabled = false;
+          })
+          .withFailureHandler(function () {
+            status.textContent = 'Server connection failed.';
+            button.disabled = false;
+          })
+          .getHealthStatus();
+      });
+    </script>
+  </body>
+</html>

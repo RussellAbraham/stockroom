@@ -1,0 +1,14 @@
+.git/**
+.gitignore
+.claspignore
+.clasprc.json
+.clasp.json
+.env
+.env.*
+node_modules/**
+tests/**
+docs/**
+screenshots/**
+package.json
+package-lock.json
+README.md
