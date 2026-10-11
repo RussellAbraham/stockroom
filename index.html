@@ -344,6 +344,69 @@
           ></p>
         </div>
       </section>
+      <section class="panel" aria-labelledby="movement-heading">
+        <div class="panel-header">
+          <div>
+            <h2 id="movement-heading">Record stock movement</h2>
+            <p class="muted">Record stock received, used, or corrected.</p>
+          </div>
+        </div>
+
+        <form id="movement-form">
+          <div class="form-group">
+            <label for="movement-product">Product</label>
+            <select id="movement-product" name="productId" required>
+              <option value="">Choose a product</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="movement-type">Movement type</label>
+            <select id="movement-type" name="type" required>
+              <option value="receipt">Receipt — stock received</option>
+              <option value="usage">Usage — stock used</option>
+              <option value="adjustment">Adjustment — correct stock</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="movement-quantity">Quantity</label>
+            <input
+              id="movement-quantity"
+              name="quantity"
+              type="number"
+              step="any"
+              required
+              placeholder="Enter quantity"
+            />
+            <p class="muted">
+              Receipts and usage require a positive quantity. Adjustments can be
+              positive or negative.
+            </p>
+          </div>
+
+          <div class="form-group">
+            <label for="movement-reason">Reason</label>
+            <input
+              id="movement-reason"
+              name="reason"
+              type="text"
+              maxlength="500"
+              required
+              placeholder="e.g. Supplier delivery or damaged stock"
+            />
+          </div>
+
+          <p
+            id="movement-status"
+            class="status"
+            role="status"
+            aria-live="polite"
+          ></p>
+
+          <button id="movement-submit" type="submit">Record movement</button>
+        </form>
+      </section>
 
       <section class="panel" aria-labelledby="products-heading">
         <div class="panel-header">
@@ -513,6 +576,7 @@
               }
 
               allProducts = result.data;
+              populateMovementProducts();
               renderFilteredProducts();
             })
             .withFailureHandler(function () {
@@ -527,6 +591,135 @@
             })
             .listProductsWithStock();
         }
+
+        function populateMovementProducts() {
+          var productSelect = document.getElementById("movement-product");
+          var previousValue = productSelect.value;
+
+          productSelect.replaceChildren();
+
+          var placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = "Choose a product";
+          productSelect.appendChild(placeholder);
+
+          allProducts.forEach(function (product) {
+            if (product.isArchived) {
+              return;
+            }
+
+            var option = document.createElement("option");
+            option.value = product.productId;
+            option.textContent = product.sku + " — " + product.name;
+            productSelect.appendChild(option);
+          });
+
+          if (
+            previousValue &&
+            Array.from(productSelect.options).some(function (option) {
+              return option.value === previousValue;
+            })
+          ) {
+            productSelect.value = previousValue;
+          }
+        }
+
+        var movementForm = document.getElementById("movement-form");
+        var movementSubmit = document.getElementById("movement-submit");
+        var movementStatus = document.getElementById("movement-status");
+
+        movementForm.addEventListener("submit", function (event) {
+          event.preventDefault();
+
+          if (!movementForm.reportValidity()) {
+            return;
+          }
+
+          var productId = document.getElementById("movement-product").value;
+          var type = document.getElementById("movement-type").value;
+          var quantity =
+            document.getElementById("movement-quantity").valueAsNumber;
+          var reason = document.getElementById("movement-reason").value.trim();
+
+          if (!Number.isFinite(quantity)) {
+            setStatus(movementStatus, "Enter a valid quantity.", "error");
+            return;
+          }
+
+          if (type === "adjustment" && quantity === 0) {
+            setStatus(
+              movementStatus,
+              "Adjustment quantity cannot be zero.",
+              "error",
+            );
+            return;
+          }
+
+          if (type !== "adjustment" && quantity <= 0) {
+            setStatus(
+              movementStatus,
+              "Receipt and usage quantities must be positive.",
+              "error",
+            );
+            return;
+          }
+
+          if (!reason) {
+            setStatus(movementStatus, "A reason is required.", "error");
+            return;
+          }
+
+          var movement = {
+            productId: productId,
+            type: type,
+            quantity: quantity,
+            reason: reason,
+            requestId:
+              "movement-" +
+              Date.now().toString(36) +
+              "-" +
+              Math.random().toString(36).slice(2),
+          };
+
+          movementSubmit.disabled = true;
+          setStatus(movementStatus, "Recording stock movement…");
+
+          google.script.run
+            .withSuccessHandler(function (result) {
+              movementSubmit.disabled = false;
+
+              if (!result || result.ok !== true) {
+                var message =
+                  result && result.error
+                    ? result.error.message
+                    : "The server returned an unexpected response.";
+
+                setStatus(movementStatus, message, "error");
+                return;
+              }
+
+              var balance = result.data.currentBalance;
+
+              movementForm.reset();
+
+              setStatus(
+                movementStatus,
+                "Movement recorded successfully. Current stock: " + balance,
+                "success",
+              );
+
+              loadProducts();
+            })
+            .withFailureHandler(function () {
+              movementSubmit.disabled = false;
+              setStatus(
+                movementStatus,
+                "Could not record the movement because of a server error.",
+                "error",
+              );
+            })
+            .createStockMovement(movement);
+        });
 
         form.addEventListener("submit", function (event) {
           event.preventDefault();

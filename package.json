@@ -1,13 +1,18 @@
+
 {
   "name": "stockroom",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Inventory and stock movement management app built with Google Apps Script and Google Sheets",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test",
+    "test:products": "node --test tests/products.test.cjs"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "inventory",
+    "google-apps-script",
+    "google-sheets"
+  ],
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
