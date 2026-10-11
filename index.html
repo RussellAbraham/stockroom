@@ -1,83 +1,616 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
-    <base target="_top">
-    <meta charset="UTF-8">
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1"
-    >
-    <title>Stockroom</title>
+    <base target="_top" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stockroom — Inventory Management</title>
+
     <style>
-      body {
+      :root {
+        color-scheme: light;
         font-family: system-ui, sans-serif;
-        max-width: 720px;
-        margin: 48px auto;
-        padding: 0 20px;
-        line-height: 1.6;
+        color: #172033;
+        background: #f5f7fa;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px 20px;
+        line-height: 1.5;
       }
 
       main {
-        border: 1px solid #d1d5db;
+        max-width: 1000px;
+        margin: 0 auto;
+      }
+
+      h1,
+      h2,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 4px;
+        font-size: 2rem;
+      }
+
+      h2 {
+        font-size: 1.2rem;
+      }
+
+      .subtitle {
+        color: #586579;
+        margin-bottom: 28px;
+      }
+
+      .panel {
+        background: #fff;
+        border: 1px solid #dce2ea;
         border-radius: 12px;
         padding: 24px;
+        margin-bottom: 24px;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+
+      .panel-header h2 {
+        margin: 0;
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .field.full-width {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #cbd3df;
+        border-radius: 7px;
+        background: #fff;
+        color: inherit;
+        font: inherit;
+      }
+
+      input:focus,
+      textarea:focus,
+      button:focus-visible {
+        outline: 3px solid #bfdbfe;
+        outline-offset: 2px;
+      }
+
+      textarea {
+        resize: vertical;
+        min-height: 80px;
       }
 
       button {
         padding: 10px 16px;
+        border: 1px solid #cbd3df;
+        border-radius: 7px;
+        background: #fff;
+        color: #172033;
+        font: inherit;
+        font-weight: 600;
         cursor: pointer;
       }
 
-      #status {
-        margin-top: 16px;
+      button.primary {
+        border-color: #1d4ed8;
+        background: #1d4ed8;
+        color: #fff;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+      }
+
+      .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 20px;
+      }
+
+      .status {
+        margin: 16px 0 0;
+        font-size: 0.9rem;
+        overflow-wrap: anywhere;
+      }
+
+      .status:empty {
+        display: none;
+      }
+
+      .status.error {
+        color: #b42318;
+      }
+
+      .status.success {
+        color: #166534;
+      }
+
+      .health-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 12px;
+        margin-top: 20px;
+        padding-top: 16px;
+        border-top: 1px solid #e5eaf0;
+      }
+
+      .health-row .status {
+        margin: 0;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+      }
+
+      th,
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #e5eaf0;
+        vertical-align: top;
+      }
+
+      th {
+        background: #f8fafc;
+        color: #475569;
+        font-size: 0.8rem;
+        font-weight: 700;
+      }
+
+      td {
+        font-size: 0.9rem;
+      }
+
+      .empty-state {
+        padding: 28px 12px;
+        color: #586579;
+        text-align: center;
+      }
+
+      .muted {
+        color: #586579;
+        font-size: 0.9rem;
+      }
+
+      .search-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 16px;
+        max-width: 420px;
+      }
+
+      .search-row input {
+        width: 100%;
+      }
+
+      @media (max-width: 600px) {
+        body {
+          padding: 20px 12px;
+        }
+
+        .panel {
+          padding: 18px;
+        }
+
+        .form-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .field.full-width {
+          grid-column: auto;
+        }
+
+        .panel-header {
+          align-items: flex-start;
+        }
       }
     </style>
   </head>
+
   <body>
     <main>
-      <h1>Stockroom</h1>
-      <p>Inventory management, built with Google Apps Script.</p>
+      <header>
+        <h1>Stockroom</h1>
+        <p class="subtitle">Inventory management for your operations.</p>
+      </header>
 
-      <button id="health-check" type="button">
-        Check server connection
-      </button>
+      <section class="panel" aria-labelledby="create-heading">
+        <h2 id="create-heading">Add product</h2>
 
-      <p id="status" role="status" aria-live="polite">
-        Not checked yet.
-      </p>
+        <form id="product-form">
+          <fieldset
+            id="product-fields"
+            style="border: 0; padding: 0; margin: 0"
+          >
+            <div class="form-grid">
+              <div class="field">
+                <label for="sku">SKU *</label>
+                <input
+                  id="sku"
+                  name="sku"
+                  type="text"
+                  maxlength="64"
+                  autocomplete="off"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label for="name">Product name *</label>
+                <input
+                  id="name"
+                  name="name"
+                  type="text"
+                  maxlength="120"
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label for="unit">Unit *</label>
+                <input
+                  id="unit"
+                  name="unit"
+                  type="text"
+                  maxlength="32"
+                  placeholder="each, box, kg..."
+                  required
+                />
+              </div>
+
+              <div class="field">
+                <label for="reorder-level">Reorder level *</label>
+                <input
+                  id="reorder-level"
+                  name="reorderLevel"
+                  type="number"
+                  min="0"
+                  step="any"
+                  value="0"
+                  required
+                />
+              </div>
+
+              <div class="field full-width">
+                <label for="description">Description</label>
+                <textarea
+                  id="description"
+                  name="description"
+                  maxlength="1000"
+                ></textarea>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button class="primary" id="save-button" type="submit">
+                Save product
+              </button>
+            </div>
+          </fieldset>
+        </form>
+
+        <p id="form-status" class="status" role="status" aria-live="polite"></p>
+
+        <div class="health-row">
+          <button id="health-check" type="button">
+            Check server connection
+          </button>
+          <p
+            id="health-status"
+            class="status"
+            role="status"
+            aria-live="polite"
+          ></p>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="products-heading">
+        <div class="panel-header">
+          <div>
+            <h2 id="products-heading">Products</h2>
+            <p id="product-count" class="muted">Loading products…</p>
+          </div>
+
+          <button id="refresh-button" type="button">Refresh</button>
+        </div>
+
+        <div class="search-row">
+          <label for="product-search">Search products</label>
+          <input
+            id="product-search"
+            type="search"
+            placeholder="Search by SKU or name..."
+            autocomplete="off"
+          />
+        </div>
+
+        <p id="list-status" class="status" role="status" aria-live="polite"></p>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">SKU</th>
+                <th scope="col">Product</th>
+                <th scope="col">Unit</th>
+                <th scope="col">Reorder level</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody id="product-table-body">
+              <tr>
+                <td colspan="5" class="empty-state">Loading products…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
 
     <script>
-      const button = document.getElementById('health-check');
-      const status = document.getElementById('status');
+      (function () {
+        "use strict";
 
-      button.addEventListener('click', function () {
-        button.disabled = true;
-        status.textContent = 'Checking server…';
+        var form = document.getElementById("product-form");
+        var productFields = document.getElementById("product-fields");
+        var saveButton = document.getElementById("save-button");
+        var formStatus = document.getElementById("form-status");
+        var healthButton = document.getElementById("health-check");
+        var healthStatus = document.getElementById("health-status");
+        var refreshButton = document.getElementById("refresh-button");
+        var listStatus = document.getElementById("list-status");
+        var tableBody = document.getElementById("product-table-body");
+        var productCount = document.getElementById("product-count");
+        var productCount = document.getElementById("product-count");
+        var searchInput = document.getElementById("product-search");
+        var allProducts = [];
 
-        google.script.run
-          .withSuccessHandler(function (result) {
-            if (
-              !result ||
-              result.ok !== true ||
-              result.application !== 'Stockroom' ||
-              result.status !== 'ready'
-            ) {
-              status.textContent = 'Unexpected server response.';
-              button.disabled = false;
-              return;
-            }
+        function setStatus(element, message, type) {
+          element.textContent = message;
+          element.className = "status" + (type ? " " + type : "");
+        }
 
-            status.textContent = 'Server connection successful.';
-            button.disabled = false;
-          })
-          .withFailureHandler(function () {
-            status.textContent = 'Server connection failed.';
-            button.disabled = false;
-          })
-          .getHealthStatus();
-      });
+        function addCell(row, value) {
+          var cell = document.createElement("td");
+          cell.textContent = value == null ? "" : String(value);
+          row.appendChild(cell);
+        }
+
+        function showEmptyTable(message) {
+          tableBody.replaceChildren();
+
+          var row = document.createElement("tr");
+          var cell = document.createElement("td");
+
+          cell.colSpan = 5;
+          cell.className = "empty-state";
+          cell.textContent = message;
+
+          row.appendChild(cell);
+          tableBody.appendChild(row);
+        }
+
+        function renderProducts(products) {
+          tableBody.replaceChildren();
+
+          if (products.length === 0) {
+            showEmptyTable(
+              allProducts.length === 0
+                ? "No products yet. Add your first product above."
+                : "No products match your search.",
+            );
+            productCount.textContent = "0 products";
+            return;
+          }
+
+          products.forEach(function (product) {
+            var row = document.createElement("tr");
+
+            addCell(row, product.sku);
+            addCell(row, product.name);
+            addCell(row, product.unit);
+            addCell(row, product.reorderLevel);
+            addCell(row, product.isArchived ? "Archived" : "Active");
+
+            tableBody.appendChild(row);
+          });
+
+          productCount.textContent =
+            products.length +
+            (products.length === 1 ? " product" : " products");
+        }
+
+        function renderFilteredProducts() {
+          var query = searchInput.value.trim().toLowerCase();
+
+          var filteredProducts = allProducts.filter(function (product) {
+            var sku = String(product.sku || "").toLowerCase();
+            var name = String(product.name || "").toLowerCase();
+
+            return sku.indexOf(query) !== -1 || name.indexOf(query) !== -1;
+          });
+
+          renderProducts(filteredProducts);
+
+          if (query) {
+            productCount.textContent =
+              filteredProducts.length + " matching products";
+          }
+        }
+
+        function loadProducts() {
+          refreshButton.disabled = true;
+          productCount.textContent = "Loading products…";
+          setStatus(listStatus, "");
+
+          google.script.run
+            .withSuccessHandler(function (result) {
+              refreshButton.disabled = false;
+
+              if (
+                !result ||
+                result.ok !== true ||
+                !Array.isArray(result.data)
+              ) {
+                productCount.textContent = "Unable to load products";
+                showEmptyTable("The server returned an unexpected response.");
+                setStatus(listStatus, "Could not load products.", "error");
+                return;
+              }
+
+              allProducts = result.data;
+              renderFilteredProducts();
+            })
+            .withFailureHandler(function () {
+              refreshButton.disabled = false;
+              productCount.textContent = "Unable to load products";
+              showEmptyTable("Products could not be loaded.");
+              setStatus(
+                listStatus,
+                "Server connection failed while loading products.",
+                "error",
+              );
+            })
+            .listProducts();
+        }
+
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+
+          if (!form.reportValidity()) {
+            return;
+          }
+
+          var reorderLevel =
+            document.getElementById("reorder-level").valueAsNumber;
+
+          if (!Number.isFinite(reorderLevel) || reorderLevel < 0) {
+            setStatus(
+              formStatus,
+              "Enter a valid, non-negative reorder level.",
+              "error",
+            );
+            return;
+          }
+
+          var product = {
+            sku: document.getElementById("sku").value,
+            name: document.getElementById("name").value,
+            unit: document.getElementById("unit").value,
+            description: document.getElementById("description").value,
+            reorderLevel: reorderLevel,
+          };
+
+          productFields.disabled = true;
+          setStatus(formStatus, "Saving product…");
+
+          google.script.run
+            .withSuccessHandler(function (result) {
+              productFields.disabled = false;
+
+              if (!result || result.ok !== true) {
+                var message =
+                  result && result.error
+                    ? result.error.message
+                    : "The server returned an unexpected response.";
+
+                setStatus(formStatus, message, "error");
+                return;
+              }
+
+              form.reset();
+              setStatus(formStatus, "Product saved successfully.", "success");
+              loadProducts();
+              document.getElementById("sku").focus();
+            })
+            .withFailureHandler(function () {
+              productFields.disabled = false;
+              setStatus(
+                formStatus,
+                "Could not save the product because of a server error.",
+                "error",
+              );
+            })
+            .createProduct(product);
+        });
+
+        healthButton.addEventListener("click", function () {
+          healthButton.disabled = true;
+          setStatus(healthStatus, "Checking server…");
+
+          google.script.run
+            .withSuccessHandler(function (result) {
+              healthButton.disabled = false;
+
+              if (
+                !result ||
+                result.ok !== true ||
+                result.application !== "Stockroom" ||
+                result.status !== "ready"
+              ) {
+                setStatus(healthStatus, "Unexpected server response.", "error");
+                return;
+              }
+
+              setStatus(
+                healthStatus,
+                "Server connection successful.",
+                "success",
+              );
+            })
+            .withFailureHandler(function () {
+              healthButton.disabled = false;
+              setStatus(healthStatus, "Server connection failed.", "error");
+            })
+            .getHealthStatus();
+        });
+
+        refreshButton.addEventListener("click", loadProducts);
+        searchInput.addEventListener("input", renderFilteredProducts);
+
+        loadProducts();
+      })();
     </script>
   </body>
 </html>
