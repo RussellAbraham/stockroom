@@ -380,3 +380,125 @@ function getStockBalance(productId) {
     }
   }
 }
+
+/**
+ * Lists active products with their current stock balances.
+ * Uses one script lock for a consistent inventory read.
+ */
+function listProductsWithStock() {
+  var lock = LockService.getScriptLock();
+
+  try {
+    if (!lock.tryLock(10000)) {
+      return movementServiceError_(
+        'LOCK_UNAVAILABLE',
+        'Inventory is busy. Please try again.'
+      );
+    }
+
+    var spreadsheet = getStockroomSpreadsheet_();
+    var productSheet = spreadsheet.getSheetByName('Products');
+    var movementSheet = spreadsheet.getSheetByName('StockMovements');
+
+    if (!productSheet || !movementSheet) {
+      throw new Error('Required inventory sheets are missing.');
+    }
+
+    var productHeaders = getMovementHeaderMap_(
+      productSheet,
+      STOCKROOM_SCHEMA.Products
+    );
+
+    var movementHeaders = getMovementHeaderMap_(
+      movementSheet,
+      STOCKROOM_SCHEMA.StockMovements
+    );
+
+    var productRows = getMovementRows_(productSheet);
+    var movementRows = getMovementRows_(movementSheet);
+    var balances = {};
+
+    movementRows.forEach(function (row) {
+      var productId = getMovementField_(
+        row,
+        movementHeaders,
+        'productId'
+      );
+
+      var delta = getMovementField_(
+        row,
+        movementHeaders,
+        'quantityDelta'
+      );
+
+      if (typeof delta !== 'number' || !Number.isFinite(delta)) {
+        throw new Error('Invalid quantity delta in stock ledger.');
+      }
+
+      balances[productId] = (balances[productId] || 0) + delta;
+    });
+
+    var products = productRows.map(function (row) {
+      var productId = getMovementField_(
+        row,
+        productHeaders,
+        'productId'
+      );
+
+      var balance = balances[productId] || 0;
+
+      if (!Number.isFinite(balance)) {
+        throw new Error('Calculated stock balance is invalid.');
+      }
+
+      if (Math.abs(balance) < 1e-9) {
+        balance = 0;
+      }
+
+      var createdAt = getMovementField_(
+        row,
+        productHeaders,
+        'createdAt'
+      );
+
+      var updatedAt = getMovementField_(
+        row,
+        productHeaders,
+        'updatedAt'
+      );
+
+      return {
+        productId: productId,
+        sku: getMovementField_(row, productHeaders, 'sku'),
+        name: getMovementField_(row, productHeaders, 'name'),
+        description: getMovementField_(row, productHeaders, 'description'),
+        unit: getMovementField_(row, productHeaders, 'unit'),
+        reorderLevel: getMovementField_(row, productHeaders, 'reorderLevel'),
+        isArchived: getMovementField_(row, productHeaders, 'isArchived'),
+        createdAt: createdAt instanceof Date
+          ? createdAt.toISOString()
+          : createdAt,
+        updatedAt: updatedAt instanceof Date
+          ? updatedAt.toISOString()
+          : updatedAt,
+        currentBalance: balance
+      };
+    });
+
+    return {
+      ok: true,
+      data: products
+    };
+  } catch (error) {
+    console.error('listProductsWithStock failed: ' + error.message);
+
+    return movementServiceError_(
+      'STORAGE_ERROR',
+      'Unable to retrieve products and stock balances.'
+    );
+  } finally {
+    if (lock.hasLock()) {
+      lock.releaseLock();
+    }
+  }
+}

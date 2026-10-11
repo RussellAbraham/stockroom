@@ -374,13 +374,14 @@
                 <th scope="col">SKU</th>
                 <th scope="col">Product</th>
                 <th scope="col">Unit</th>
+                <th scope="col">Current stock</th>
                 <th scope="col">Reorder level</th>
                 <th scope="col">Status</th>
               </tr>
             </thead>
             <tbody id="product-table-body">
               <tr>
-                <td colspan="5" class="empty-state">Loading products…</td>
+                <td colspan="6" class="empty-state">Loading products…</td>
               </tr>
             </tbody>
           </table>
@@ -446,11 +447,23 @@
 
           products.forEach(function (product) {
             var row = document.createElement("tr");
+            var balance = Number(product.currentBalance || 0);
+            var reorderLevel = Number(product.reorderLevel || 0);
 
             addCell(row, product.sku);
             addCell(row, product.name);
             addCell(row, product.unit);
-            addCell(row, product.reorderLevel);
+            addCell(row, balance);
+
+            var reorderCell = document.createElement("td");
+            reorderCell.textContent = String(reorderLevel);
+
+            if (!product.isArchived && balance <= reorderLevel) {
+              reorderCell.textContent += " — Low stock";
+              reorderCell.classList.add("low-stock");
+            }
+
+            row.appendChild(reorderCell);
             addCell(row, product.isArchived ? "Archived" : "Active");
 
             tableBody.appendChild(row);
@@ -512,7 +525,7 @@
                 "error",
               );
             })
-            .listProducts();
+            .listProductsWithStock();
         }
 
         form.addEventListener("submit", function (event) {

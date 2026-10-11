@@ -1,4 +1,3 @@
-
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
@@ -76,12 +75,16 @@ function createTestEnvironment(options = {}) {
     released: false,
 
     tryLock() {
-      return options.lockAvailable !== false;
+      if (options.lockAvailable === false) {
+        return false;
+      }
+
+      this.released = false;
+      return true;
     },
 
     hasLock() {
-      return this.released === false &&
-        options.lockAvailable !== false;
+      return this.released === false && options.lockAvailable !== false;
     },
 
     releaseLock() {
@@ -139,10 +142,7 @@ function createTestEnvironment(options = {}) {
     "products.gs",
     "movements.gs",
   ]) {
-    const source = fs.readFileSync(
-      path.join(__dirname, "..", file),
-      "utf8",
-    );
+    const source = fs.readFileSync(path.join(__dirname, "..", file), "utf8");
 
     vm.runInContext(source, context, { filename: file });
   }
@@ -250,9 +250,7 @@ test("rejects duplicate SKUs regardless of case", () => {
 
   assert.equal(context.createProduct(validProduct()).ok, true);
 
-  const duplicate = context.createProduct(
-    validProduct({ sku: "part-001" }),
-  );
+  const duplicate = context.createProduct(validProduct({ sku: "part-001" }));
 
   assert.equal(duplicate.ok, false);
   assert.equal(duplicate.error.code, "DUPLICATE_SKU");
@@ -262,9 +260,7 @@ test("rejects duplicate SKUs regardless of case", () => {
 test("does not write invalid product input", () => {
   const { context, productsSheet, lock } = createTestEnvironment();
 
-  const result = context.createProduct(
-    validProduct({ name: " " }),
-  );
+  const result = context.createProduct(validProduct({ name: " " }));
 
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "VALIDATION_ERROR");
@@ -340,9 +336,7 @@ test("records a receipt and returns the updated balance", () => {
   const { context, movementsSheet } = createTestEnvironment();
   const productId = seedMovementProduct(context);
 
-  const result = context.createStockMovement(
-    movementInput(productId),
-  );
+  const result = context.createStockMovement(movementInput(productId));
 
   assert.equal(result.ok, true);
   assert.equal(result.data.quantityDelta, 10);
@@ -445,9 +439,7 @@ test("rejects duplicate request IDs without adding another movement", () => {
 test("rejects movements for nonexistent products", () => {
   const { context, movementsSheet } = createTestEnvironment();
 
-  const result = context.createStockMovement(
-    movementInput("missing-product"),
-  );
+  const result = context.createStockMovement(movementInput("missing-product"));
 
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "PRODUCT_NOT_FOUND");
@@ -455,8 +447,7 @@ test("rejects movements for nonexistent products", () => {
 });
 
 test("rejects movements for archived products", () => {
-  const { context, productsSheet, movementsSheet } =
-    createTestEnvironment();
+  const { context, productsSheet, movementsSheet } = createTestEnvironment();
 
   const productId = seedMovementProduct(context);
   const productHeaders = context.STOCKROOM_SCHEMA.Products;
@@ -464,16 +455,13 @@ test("rejects movements for archived products", () => {
   const productIdColumn = productHeaders.indexOf("productId");
 
   const productRow = productsSheet.rows.find(
-    (row, index) =>
-      index > 0 && row[productIdColumn] === productId,
+    (row, index) => index > 0 && row[productIdColumn] === productId,
   );
 
   assert.ok(productRow);
   productRow[archivedColumn] = true;
 
-  const result = context.createStockMovement(
-    movementInput(productId),
-  );
+  const result = context.createStockMovement(movementInput(productId));
 
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "PRODUCT_ARCHIVED");
@@ -530,15 +518,12 @@ test("supports fractional quantities", () => {
 });
 
 test("rejects movements when the lock is unavailable", () => {
-  const { context, options, movementsSheet } =
-    createTestEnvironment();
+  const { context, options, movementsSheet } = createTestEnvironment();
 
   const productId = seedMovementProduct(context);
   options.lockAvailable = false;
 
-  const result = context.createStockMovement(
-    movementInput(productId),
-  );
+  const result = context.createStockMovement(movementInput(productId));
 
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "LOCK_UNAVAILABLE");
@@ -546,15 +531,12 @@ test("rejects movements when the lock is unavailable", () => {
 });
 
 test("returns a controlled error when movement storage fails", () => {
-  const { context, options, movementsSheet } =
-    createTestEnvironment();
+  const { context, options, movementsSheet } = createTestEnvironment();
 
   const productId = seedMovementProduct(context);
   options.storageFailure = true;
 
-  const result = context.createStockMovement(
-    movementInput(productId),
-  );
+  const result = context.createStockMovement(movementInput(productId));
 
   assert.equal(result.ok, false);
   assert.equal(result.error.code, "STORAGE_ERROR");
@@ -579,4 +561,58 @@ test("releases the movement lock after a storage failure", () => {
   context.createStockMovement(movementInput(productId));
 
   assert.equal(lock.released, true);
+});
+
+test("lists products with zero stock when no movements exist", () => {
+  const { context } = createTestEnvironment();
+  const productId = seedMovementProduct(context);
+
+  const result = context.listProductsWithStock();
+
+  assert.equal(result.ok, true);
+
+  const product = result.data.find(
+    (item) => item.productId === productId,
+  );
+
+  assert.ok(product);
+  assert.equal(product.currentBalance, 0);
+});
+
+test("lists products with balances calculated from movements", () => {
+  const { context } = createTestEnvironment();
+  const productId = seedMovementProduct(context);
+
+  context.createStockMovement(movementInput(productId));
+
+  context.createStockMovement(
+    movementInput(productId, {
+      type: "usage",
+      quantity: 3,
+      requestId: "request-002",
+      reason: "Used for testing",
+    }),
+  );
+
+  const result = context.listProductsWithStock();
+
+  assert.equal(result.ok, true);
+
+  const product = result.data.find(
+    (item) => item.productId === productId,
+  );
+
+  assert.equal(product.currentBalance, 7);
+});
+
+test("returns a controlled error when listing stock fails", () => {
+  const { context, options } = createTestEnvironment();
+
+  seedMovementProduct(context);
+  options.storageFailure = true;
+
+  const result = context.listProductsWithStock();
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, "STORAGE_ERROR");
 });
